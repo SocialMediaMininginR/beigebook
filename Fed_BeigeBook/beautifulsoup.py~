@@ -1,0 +1,230 @@
+from bs4 import BeautifulSoup
+from urllib2 import HTTPError, urlopen
+import codecs
+import re
+
+def month_to_number(month):
+	if month == 'January':
+		return '01'
+	if month == 'February':
+		return '02'
+	if month == 'March':
+		return '03'
+	if month == 'April':
+		return '04'
+	if month == 'May':
+		return '05'
+	if month == 'June':
+		return '06'
+	if month == 'July':
+		return '07'
+	if month == 'August':
+		return '08'
+	if month == 'September':
+		return '09'
+	if month == 'October':
+		return 10
+	if month == 'November':
+		return 11
+	if month == 'December':
+		return 12
+
+def fix_day(day):
+	if len(day) == 1:
+		return "0"+str(day)
+	else:
+		return str(day)
+
+def clear_spaces(string):
+	return string.replace('\t\t', ' ').replace('\t', ' ').replace('     ', ' ').replace('    ', ' ').replace('   ', ' ').replace('  ', ' ').strip()
+
+def strip_phrases(string):
+	phrases = ['First District--Boston', 'Second District--New York', 'Third District--Philadelphia', 'Fourth District--Cleveland', 'Fifth District--Richmond', 'Sixth District--Atlanta', 'Seventh District--Chicago', 'Eighth District--St. Louis', 'Ninth District--Minneapolis', 'Tenth District--Kansas City', 'Eleventh District--Dallas', 'Twelfth District--San Francisco']
+
+	for p in phrases:
+		string = string.replace(p, '')
+	return string
+
+
+url = 'http://www.federalreserve.gov/monetarypolicy/beigebook/default.htm'
+html_data = urlopen(url).read()
+
+p = re.compile('beigebook[\d][\d][\d][\d][\d][\d].htm')
+pages = p.findall(html_data)
+
+parsed_html = BeautifulSoup(html_data)
+counter = {}
+new_urls = {}
+old_urls = {}
+for a in parsed_html.find_all('a'):
+	if a.text[0:12] == 'Beige Book -':
+		if a.text in counter:
+			pass
+		else:
+			counter[a.text] = 1
+			date = a.text.replace('Beige Book - ', '')
+			#print a.text
+			#print date
+			year = date.split(',')[1].strip()
+			month = month_to_number(date.split(',')[0].split(' ')[0].strip())
+			day = fix_day(date.split(',')[0].split(' ')[1].strip())
+			
+			url = ''
+
+			if int(year) >= 2011:
+				if month == '03' and year == '2011':
+					url = 'http://www.federalreserve.gov/monetarypolicy/beigebook/beigebook20110302.htm'
+				else:
+					url = 'http://www.federalreserve.gov/monetarypolicy/beigebook/beigebook'+str(year)+str(month)+'.htm'
+				new_urls[url] = [year, month, day]
+			else:
+				url = 'http://www.federalreserve.gov/fomc/beigebook/'+str(year)+'/'+str(year)+str(month)+str(day)+'/FullReport.htm'
+				old_urls[url] = [year, month, day]
+
+output = codecs.open('output.csv', encoding='utf-8', mode='w')
+
+output.write('location|year|month|text\n')
+
+for url in new_urls:
+	print url
+
+	year = new_urls[url][0]
+	month = new_urls[url][1]
+	day = new_urls[url][2]
+
+
+	html_data = urlopen(url).read()
+	parsed_html = BeautifulSoup(html_data)
+
+	summary = parsed_html.body.find('div', attrs={'id':'div_summary'})
+	boston = parsed_html.body.find('div', attrs={'id':'div_boston'})
+	new_york = parsed_html.body.find('div', attrs={'id':'div_new_york'})
+	philadelphia = parsed_html.body.find('div', attrs={'id':'div_philadelphia'})
+	cleveland = parsed_html.body.find('div', attrs={'id':'div_cleveland'})
+	richmond = parsed_html.body.find('div', attrs={'id':'div_richmond'})
+	atlanta = parsed_html.body.find('div', attrs={'id':'div_atlanta'})
+	chicago = parsed_html.body.find('div', attrs={'id':'div_chicago'})
+	st_louis = parsed_html.body.find('div', attrs={'id':'div_st_louis'})
+	minneapolis = parsed_html.body.find('div', attrs={'id':'div_minneapolis'})
+	kansas_city = parsed_html.body.find('div', attrs={'id':'div_kansas_city'})
+	dallas = parsed_html.body.find('div', attrs={'id':'div_dallas'})
+	san_francisco = parsed_html.body.find('div', attrs={'id':'div_san_francisco'})
+
+	locations = {'summary': summary, 'new_york': new_york, 'boston': boston, 'philadelphia': philadelphia, 'cleveland': cleveland, 'richmond': richmond, 'atlanta': atlanta, 'chicago': chicago, 'st_louis': st_louis, 'minneapolis': minneapolis, 'kansas_city': kansas_city, 'dallas': dallas, 'san_francisco': san_francisco}
+
+	for location in locations:
+		#for cat in locations[location].find_all(re.compile(r"strong")):
+			#for cat_parent in cat.find_parents("p"):
+		#text = unicode(locations[location].text.replace(cat.text.strip(), '').replace('\n', ''))
+		text = unicode(clear_spaces(locations[location].text.replace('\n', '')))
+		output_text = str(location)+'|'+str(year)+'|'+str(int(month))+'|'+unicode(strip_phrases(text).strip())
+		#print output_text
+		output.write(output_text+'\n')
+		#output.write(str(location)+'|'+unicode(cat.text.strip())+'|'+str(year)+'|'+str(int(month))+'|'+unicode(text.strip())+'\n')
+exit()
+
+for url in old_urls:	
+
+	year = old_urls[url][0]
+	month = old_urls[url][1]
+	day = old_urls[url][2]
+
+	#if (int(year) == 2003 or int(year) == 2004):
+	#	continue
+
+
+	print url
+
+	html_data = urlopen(url).read()
+	parsed_html = BeautifulSoup(html_data)	
+
+
+	current_city = ''
+
+	locations = {'Summary': {'P': '', 'S': ''}, 'Boston': {'P': '', 'S': ''}, 'New York': {'P': '', 'S': ''}, 'Philadelphia': {'P': '', 'S': ''}, 'Cleveland': {'P': '', 'S': ''}, 'Richmond': {'P': '', 'S': ''}, 'Atlanta': {'P': '', 'S': ''}, 'Chicago': {'P': '', 'S': ''}, 'St. Louis': {'P': '', 'S': ''}, 'Minneapolis': {'P': '', 'S': ''}, 'Kansas City': {'P': '', 'S': ''}, 'Dallas': {'P': '', 'S': ''}, 'San Francisco': {'P': '', 'S': ''}}
+	count = 0
+	current_city = ''
+	for tag in parsed_html.body.find_all(True):
+		#print tag.name
+		if tag.name == 'font':
+#			print '+++\nTAG: '+str(tag.name)+'\n+++'
+			#print '\n\n\n'
+			if tag.text.strip().find('--') != -1:
+				#print 'F: '+tag.text.split('--')[1].strip()
+				current_city = tag.text.split('--')[1].strip()
+			elif tag.text.strip() == 'Summary':
+				#print 'F: '+tag.text.strip()
+				current_city = 'Summary'
+			#print count
+		if tag.name == 'strong':
+			text = tag.text.strip()
+			if text.find('District--') != -1:
+				pass
+			elif text.find('Prepared at the Federal Reserve Bank of') != -1:
+				pass
+			elif text.find('Last update: ') != -1:
+				pass
+			else:
+				if current_city != '':
+#					print 'S: '+text
+#					print count
+					locations[current_city]['S'] += text+'|'
+					locations[current_city]['P'] += ' ### '+str(text)+' ### '
+		if tag.name == 'p':
+			text = tag.text.strip()
+			if text.find('Return to top') != -1:
+				pass
+			elif text.find('District--') != -1:
+				pass
+			else:
+				if current_city != '':
+#					print 'P: '+tag.text.strip()
+					locations[current_city]['P'] += text.replace('\r\n\r\n', ' ')
+			#print count
+		count += 1
+	
+	for l in locations:
+		#print l+': '+unicode(year)+'/'+unicode(int(month))+'/'+unicode(int(day))
+		
+		P = locations[l]['P']
+		S = locations[l]['S']
+
+		sectors = []
+		indexes = []
+
+		for sector in S.split('|')[0:-1]:
+			s_rindex = P.rindex('### '+sector+' ###')
+
+			indexes.append(s_rindex)
+			if sector.find('Last update: ') == -1:
+				sectors.append(sector)
+		
+		#print sectors
+
+		for s in range(0, len(sectors)):
+			
+			if s == 0:
+				sector_text = P[0:indexes[s]]
+				#overview_text = sector_text[0:sector_text.index(sectors[s].strip())]
+				#str_output = unicode(l)+'|Overview|'+unicode(year)+'|'+unicode(int(month))+'|'+unicode(int(day))+'|'+unicode(clear_spaces(overview_text))+'\n'
+				#output.write(str_output)
+				try: 
+					sector_text = sector_text[sector_text.index(sectors[s].strip()):-1].replace(sectors[s].strip()+' ', '', 1)
+				except:
+					#print sectors[s]
+					#print sector_text
+					pass
+			else:
+				sector_text = P[indexes[s-1]:indexes[s]]
+
+			for sector in sectors:
+				sector_text = sector_text.replace('### '+sector+' ###', '').replace(sectors[s].strip()+' ', '', 1)
+
+			str_output = unicode(l)+'|'+unicode(sectors[s])+'|'+unicode(year)+'|'+unicode(int(month))+'|'+unicode(int(day))+'|'+unicode(clear_spaces(sector_text))+'\n'
+			#print str_output
+			output.write(str_output)
+
+
+output.close()
+			
+
